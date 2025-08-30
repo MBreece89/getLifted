@@ -1,5 +1,7 @@
 # getLifted
 
+A project to learn Go
+
 🚀 Go Advantages:
 
 Goroutines: Each request handled concurrently with minimal memory overhead
