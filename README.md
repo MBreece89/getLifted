@@ -1,49 +1,21 @@
-# getLifted
+## Endpoints
 
-🚀 Go Advantages:
+- `GET /healthz` → JSON health
+- `GET /workout?body=legs` → workouts filtered by body part
+- `GET /workout?style=hiit` → workouts filtered by style
+- `GET /workout/random` → one random workout
 
-Goroutines: Each request handled concurrently with minimal memory overhead
-Fast JSON encoding: Native JSON marshaling is extremely fast
-Low memory footprint: ~5-10MB memory usage vs Node.js ~50MB+
-No garbage collection pauses during request handling
-Compiled binary: No runtime interpretation overhead
 
-🏗️ API Features:
+make run
+curl -s localhost:8080/workout?body=legs | jq
+curl -s localhost:8080/workout/random | jq
 
-CORS enabled for web client access
-Proper error handling with structured JSON responses
-Query parameters: ?style=functional&equipment=garage
-Health check endpoint for monitoring
-Clean JSON responses with all workout data
 
-Example API Calls:
-bash# Default functional gym workout
-GET http://localhost:8080/workout
-
-# Functional garage workout  
-GET http://localhost:8080/workout?style=functional&equipment=garage
-
-# Bodybuilding calisthenics workout
-GET http://localhost:8080/workout?style=bodybuilding&equipment=calisthenics
-
-# Get all available options
-GET http://localhost:8080/styles
-
-# Health check
-GET http://localhost:8080/health
-To Run:
-bash# Initialize Go module
-go mod init workout-api
-
-# Run the server
-go run main.go
-
-# Or build and run binary
-go build -o workout-api
-./workout-api
-Performance Expectations:
-
-100 req/min: Easily handled with <1ms response times
-1000+ req/min: Still performs excellently
-Memory: ~10-20MB under load vs Node.js ~100MB+
-CPU: Much more efficient than interpreted languages
+## 2025-08-30 — Step 1 (Workout Service)
+- Added workout dataset (in-memory)
+- Endpoints:
+  - GET /workout?body=...
+  - GET /workout?style=...
+  - GET /workout/random
+- Basic tests for filtering
+- Next: consistent error responses + input validation
