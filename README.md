@@ -91,7 +91,34 @@ Copy code
 markdown
 Copy code
 
-3. Save and rebuild the service. The new exercise will be included automatically in plans.
+3.  Build service in docker
+# 1️⃣ Build the Docker image
+docker build -t workout-service .
+
+# 2️⃣ Stop and remove any existing container named "workout"
+docker stop workout -ErrorAction SilentlyContinue
+docker rm workout -ErrorAction SilentlyContinue
+
+# 3️⃣ Run the container
+docker run -d -p 8080:8080 --name workout workout-service
+
+# 4️⃣ Wait a few seconds for the server to start
+Start-Sleep -Seconds 3
+
+# 5️⃣ Test endpoints
+Write-Host "Testing /workout endpoint..."
+curl http://127.0.0.1:8080/workout
+
+Write-Host "`nTesting /workout?bodyPart=legs endpoint..."
+curl "http://127.0.0.1:8080/workout?bodyPart=legs"
+
+Write-Host "`nTesting /workout/plan endpoint..."
+curl "http://127.0.0.1:8080/workout/plan?bodyPart=core&style=strength"
+
+Write-Host "`nTesting /workout/options endpoint..."
+curl http://127.0.0.1:8080/workout/options
+
+
 
 ### Contributing
 - Fork the repository
