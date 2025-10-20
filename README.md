@@ -119,7 +119,6 @@ Write-Host "`nTesting /workout/options endpoint..."
 curl http://127.0.0.1:8080/workout/options
 
 
-
 ### Contributing
 - Fork the repository
 - Add new workouts or improve the plan generation
