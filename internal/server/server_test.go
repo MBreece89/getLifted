@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/MBreece89/getLifted/internal/server"
@@ -69,5 +70,101 @@ func TestInvalidStyleReturnsBadRequest(t *testing.T) {
 	}
 	if errResp["error"] != "invalid style" {
 		t.Errorf("expected invalid style error, got %v", errResp["error"])
+	}
+}
+
+func TestTypeAliasQueryParam(t *testing.T) {
+	s := server.New()
+
+	req := httptest.NewRequest(http.MethodGet, "/workout?bodyPart=legs&type=strength", nil)
+	rr := httptest.NewRecorder()
+	s.Mux().ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+
+	var workout server.Workout
+	if err := json.Unmarshal(rr.Body.Bytes(), &workout); err != nil {
+		t.Fatalf("invalid json: %v", err)
+	}
+	if workout.Style != "strength" {
+		t.Errorf("expected style=strength, got %q", workout.Style)
+	}
+}
+
+func TestCommandsEndpoint(t *testing.T) {
+	s := server.New()
+
+	req := httptest.NewRequest(http.MethodGet, "/commands", nil)
+	rr := httptest.NewRecorder()
+	s.Mux().ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+
+	var cmds []map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &cmds); err != nil {
+		t.Fatalf("invalid json: %v", err)
+	}
+
+	found := false
+	for _, cmd := range cmds {
+		if cmd["command"] == "get-workout" {
+			if params, ok := cmd["params"].([]interface{}); ok {
+				for _, p := range params {
+					if p == "type (alias: style)" {
+						found = true
+					}
+				}
+			}
+		}
+	}
+
+	if !found {
+		t.Fatal("expected get-workout params to include type alias metadata")
+	}
+}
+
+func TestLogsEndpointAcceptsValidEvent(t *testing.T) {
+	s := server.New()
+
+	payload := map[string]interface{}{
+		"timestamp": "2026-06-19T00:00:00Z",
+		"command":   "get-workout --type strength",
+		"params":    map[string]string{"type": "strength"},
+		"status":    200,
+		"latency":   12.5,
+	}
+
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/logs", strings.NewReader(string(body)))
+	rr := httptest.NewRecorder()
+	s.Mux().ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d", rr.Code)
+	}
+}
+
+func TestLogsEndpointRejectsInvalidEvent(t *testing.T) {
+	s := server.New()
+
+	payload := map[string]interface{}{
+		"timestamp": "",
+		"command":   "get-workout",
+		"params":    map[string]string{"type": "strength"},
+		"status":    0,
+		"latency":   -1,
+	}
+
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/logs", strings.NewReader(string(body)))
+	rr := httptest.NewRecorder()
+	s.Mux().ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rr.Code)
 	}
 }

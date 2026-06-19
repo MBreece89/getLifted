@@ -5,120 +5,132 @@ A simple Go service that generates workouts and full workout plans. Filter by **
 
 ### Prerequisites
 - Go 1.21+ installed
-- Basic understanding of `go run` and `go build`
+- Node 20+ and npm installed
+- Basic understanding of `go run`, `npm`, and `git`
 
 ### Setup & Build
 1. Clone the repository:
 
-git clone https://github.com/your-username/workout-service.git
-cd workout-service
+```sh
+git clone https://github.com/MBreece89/getLifted.git
+cd getLifted
+```
 
-markdown
-Copy code
+2. Build the backend service:
 
-2. Build the service:
-
+```sh
 go build -o workoutservice ./cmd/workoutservice
+```
 
-shell
-Copy code
+3. Install frontend dependencies:
 
-This generates an executable named `workoutservice`.
+```sh
+npm --prefix frontend/terminal-ui install
+```
 
 ### Run the Service
-#### Development (with `go run`):
 
+#### Backend only (development):
+
+```sh
 go run ./cmd/workoutservice
+```
 
-shell
-Copy code
+The backend listens on `http://localhost:8080` by default.
 
-#### Production (compiled binary):
+#### Frontend terminal UI:
 
-./workoutservice
+```sh
+npm --prefix frontend/terminal-ui start
+```
 
-nginx
-Copy code
+Open `http://localhost:4200` in your browser to use the terminal-style frontend.
 
-The server runs on `http://localhost:8080` by default.
+#### Full stack local workflow
+- Start the backend with `go run ./cmd/workoutservice`
+- Start the frontend with `npm --prefix frontend/terminal-ui start`
+- Use the UI at `http://localhost:4200`
 
-### Example Requests
+### Available Frontend Commands
+From the terminal UI, use:
 
-Get a random workout:
+- `help` — show available commands and backend metadata
+- `get-workout [type] [bodyPart]` — fetch a random workout
+- `plan [type] [bodyPart]` — fetch a full workout plan
+- `options` — list supported workout types and body parts
 
+Example:
+
+```sh
+get-workout strength legs
+plan cardio core
+options
+```
+
+### Backend API Endpoints
+
+- `GET /workout` — random workout
+- `GET /workout?type=<type>&bodyPart=<bodyPart>` — random workout filtered by type and body part
+- `GET /workout/plan?type=<type>&bodyPart=<bodyPart>` — full workout plan
+- `GET /workout/options` — listing of supported body parts and styles
+- `GET /commands` — available terminal commands and parameters
+- `POST /logs` — accept structured log events from the frontend
+
+Example requests:
+
+```sh
 curl http://localhost:8080/workout
-
-css
-Copy code
-
-Filter by body part:
-
-curl http://localhost:8080/workout?bodyPart=legs
-
-sql
-Copy code
-
-Get a full workout plan:
-
-curl http://localhost:8080/workout/plan?bodyPart=core&style=strength
-
-arduino
-Copy code
-
-See available options:
-
+curl "http://localhost:8080/workout?type=strength&bodyPart=legs"
+curl "http://localhost:8080/workout/plan?type=core&bodyPart=strength"
 curl http://localhost:8080/workout/options
+curl http://localhost:8080/commands
+```
 
-markdown
-Copy code
+### Run Tests
 
-**Example response:**
+Backend tests:
 
-{
-"bodyParts": ["chest", "legs", "back", "arms", "shoulders", "core", "full body"],
-"styles": ["strength", "cardio", "flexibility", "balance"]
-}
+```sh
+go test ./internal/server
+```
 
-markdown
-Copy code
+Frontend tests:
+
+```sh
+npm --prefix frontend/terminal-ui run test -- --watch=false
+```
+
+### Docker
+
+Build the Docker image:
+
+```sh
+docker build -t workout-service .
+```
+
+Run the container:
+
+```sh
+docker run -d -p 8080:8080 --name workout workout-service
+```
+
+Test endpoints:
+
+```sh
+curl http://127.0.0.1:8080/workout
+curl "http://127.0.0.1:8080/workout?bodyPart=legs"
+curl "http://127.0.0.1:8080/workout/plan?bodyPart=core&style=strength"
+curl http://127.0.0.1:8080/workout/options
+```
 
 ### Adding Exercises
+
 1. Open `internal/server/data.go`
-2. Add a new `Workout` struct to the `workouts` slice:
+2. Add a new `Workout` entry to the `workouts` slice:
 
-{Name: "New Exercise", BodyPart: "legs", Style: "strength", Sets: 3, Reps: 12}
-
-markdown
-Copy code
-
-3.  Build service in docker
-# 1️⃣ Build the Docker image
-docker build -t workout-service .
-
-# 2️⃣ Stop and remove any existing container named "workout"
-docker stop workout -ErrorAction SilentlyContinue
-docker rm workout -ErrorAction SilentlyContinue
-
-# 3️⃣ Run the container
-docker run -d -p 8080:8080 --name workout workout-service
-
-# 4️⃣ Wait a few seconds for the server to start
-Start-Sleep -Seconds 3
-
-# 5️⃣ Test endpoints
-Write-Host "Testing /workout endpoint..."
-curl http://127.0.0.1:8080/workout
-
-Write-Host "`nTesting /workout?bodyPart=legs endpoint..."
-curl "http://127.0.0.1:8080/workout?bodyPart=legs"
-
-Write-Host "`nTesting /workout/plan endpoint..."
-curl "http://127.0.0.1:8080/workout/plan?bodyPart=core&style=strength"
-
-Write-Host "`nTesting /workout/options endpoint..."
-curl http://127.0.0.1:8080/workout/options
-
-
+```go
+Workout{Name: "New Exercise", BodyPart: "legs", Style: "strength", Sets: 3, Reps: 12}
+```
 
 ### Contributing
 - Fork the repository

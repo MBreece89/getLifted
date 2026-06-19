@@ -62,13 +62,16 @@ func New() *Server {
 func (s *Server) Routes() {
 	http.HandleFunc("/workout", s.handleWorkout)
 	http.HandleFunc("/workout/plan", s.handlePlan)
+	http.HandleFunc("/commands", s.handleCommands)
 	http.HandleFunc("/workout/options", s.handleOptions)
+	http.HandleFunc("/logs", s.handleLogs)
 }
 
 // --- Handlers ---
 
 // handleWorkout returns a single random workout (optionally filtered)
 func (s *Server) handleWorkout(w http.ResponseWriter, r *http.Request) {
+	log.Printf("/workout request from %s %s", r.RemoteAddr, r.URL.RawQuery)
 	bodyPart, style, err := parseFilters(r)
 	if err != nil {
 		writeAPIError(w, err)
@@ -89,6 +92,7 @@ func (s *Server) handleWorkout(w http.ResponseWriter, r *http.Request) {
 
 // handlePlan returns a full workout plan (flat list of exercises)
 func (s *Server) handlePlan(w http.ResponseWriter, r *http.Request) {
+	log.Printf("/workout/plan request from %s %s", r.RemoteAddr, r.URL.RawQuery)
 	bodyPart, style, err := parseFilters(r)
 	if err != nil {
 		writeAPIError(w, err)
@@ -116,11 +120,54 @@ func (s *Server) handlePlan(w http.ResponseWriter, r *http.Request) {
 
 // handleOptions returns the available body parts and styles
 func (s *Server) handleOptions(w http.ResponseWriter, r *http.Request) {
+	log.Printf("/workout/options request from %s", r.RemoteAddr)
 	opts := map[string][]string{
 		"bodyParts": allowedBodyParts,
 		"styles":    allowedStyles,
 	}
 	writeJSON(w, opts)
+}
+
+// handleCommands returns available terminal-style commands and descriptions
+func (s *Server) handleCommands(w http.ResponseWriter, r *http.Request) {
+	log.Printf("/commands request from %s", r.RemoteAddr)
+	cmds := []map[string]interface{}{
+		{"command": "help", "description": "List available commands and usage"},
+		{"command": "get-workout", "description": "Retrieve a single random workout", "params": []string{"type (alias: style)", "bodyPart"}},
+		{"command": "plan", "description": "Get a short workout plan (up to 5 exercises)", "params": []string{"type (alias: style)", "bodyPart"}},
+		{"command": "options", "description": "List supported body parts and types"},
+	}
+	writeJSON(w, cmds)
+}
+
+// handleLogs accepts structured log events and returns 202 accepted.
+func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
+	log.Printf("/logs request from %s %s", r.RemoteAddr, r.Method)
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed", "POST /logs only")
+		return
+	}
+
+	var event struct {
+		Timestamp string      `json:"timestamp"`
+		Command   string      `json:"command"`
+		Params    interface{} `json:"params"`
+		Status    int         `json:"status"`
+		Latency   float64     `json:"latency"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid log payload", err.Error())
+		return
+	}
+
+	if event.Timestamp == "" || event.Command == "" || event.Status == 0 || event.Latency < 0 {
+		writeError(w, http.StatusBadRequest, "invalid log payload", "missing required fields")
+		return
+	}
+
+	log.Printf("log event: command=%s status=%d latency=%.2fms", event.Command, event.Status, event.Latency)
+	w.WriteHeader(http.StatusAccepted)
 }
 
 // --- Helpers ---
@@ -132,6 +179,14 @@ func parseFilters(r *http.Request) (string, string, *apiError) {
 	}
 
 	style := r.URL.Query().Get("style")
+	// support 'type' as an alternative query param for style
+	if style == "" {
+		style = r.URL.Query().Get("type")
+	}
+	// support 'genre' as backward-compatible alias for style
+	if style == "" {
+		style = r.URL.Query().Get("genre")
+	}
 
 	if bodyPart != "" {
 		normalized, ok := normalizeFilter(bodyPart, bodyPartAliases)
@@ -209,6 +264,8 @@ func (s *Server) Mux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/workout", s.handleWorkout)
 	mux.HandleFunc("/workout/plan", s.handlePlan)
+	mux.HandleFunc("/commands", s.handleCommands)
 	mux.HandleFunc("/workout/options", s.handleOptions)
+	mux.HandleFunc("/logs", s.handleLogs)
 	return mux
 }
