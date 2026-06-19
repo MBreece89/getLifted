@@ -1,0 +1,27 @@
+{
+  "name": "@agent-template/dev-team",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Developer Supervisor + Developer agent process (Agent SDK harness). Tooling, not shipped product code.",
+  "scripts": {
+    "test": "vitest run",
+    "test:agents": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "dev:real": "tsx --env-file-if-exists=../.env --env-file-if-exists=../.env.local dev-team/realTask.ts",
+    "dev:issues": "tsx --env-file-if-exists=../.env --env-file-if-exists=../.env.local dev-team/issuesTask.ts",
+    "dev:team": "tsx --env-file-if-exists=../.env --env-file-if-exists=../.env.local dev-team/teamTask.ts",
+    "dev:explore": "tsx --env-file-if-exists=../.env --env-file-if-exists=../.env.local dev-team/exploreTask.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.177",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^4.1.8"
+  }
+}

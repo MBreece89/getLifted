@@ -1,0 +1,51 @@
+name: Skill updates
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'   # every Monday 9am UTC
+  workflow_dispatch:        # manual trigger from the Actions tab
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-updates:
+    name: Check GitHub-sourced skills for upstream changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Fetch updated skill files
+        run: bash scripts/check-skill-updates.sh --update --ci
+
+      - name: Open PR if updates found
+        run: |
+          if [[ ! -f .skill-updates-summary.md ]]; then
+            echo "No upstream changes — nothing to do."
+            exit 0
+          fi
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          BRANCH="skill-updates/$(date +%Y-%m-%d)"
+
+          # Skip if this branch already exists (re-run on same day without merge).
+          if git ls-remote --exit-code origin "refs/heads/$BRANCH" >/dev/null 2>&1; then
+            echo "Branch $BRANCH already exists — skipping duplicate PR."
+            exit 0
+          fi
+
+          git checkout -b "$BRANCH"
+          git add .claude/skills/ skills-lock.json
+          git commit -m "chore: sync GitHub-sourced skills from upstream ($(date +%Y-%m-%d))"
+          git push origin "$BRANCH"
+
+          gh pr create \
+            --title "chore: skill updates from upstream ($(date +%Y-%m-%d))" \
+            --body "$(cat .skill-updates-summary.md)" \
+            --base main \
+            --head "$BRANCH"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

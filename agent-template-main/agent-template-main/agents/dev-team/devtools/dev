@@ -1,0 +1,158 @@
+#!/usr/bin/env sh
+#
+# dev — token-frugal dev-tool dispatcher for the Developer agent.
+#
+# A single, repo-agnostic entry point a Developer agent runs *itself* (via Bash)
+# to typecheck / test / lint / build a workspace. It exists for two reasons:
+#
+#   1. Token frugality. Raw `pnpm test` / `tsc` dump pass+fail noise into the
+#      agent's context. Every command here is routed through `rtk` (Rust Token
+#      Killer) when it is on PATH, which returns failures-only / grouped output
+#      (60-99% fewer tokens). If `rtk` is absent it degrades to the raw tool, so
+#      the script is always safe to run.
+#   2. One stable contract. The agent learns ONE interface (`dev <verb>`) instead
+#      of memorising each repo's package-manager quirks. The script discovers the
+#      repo root, the package manager, and which scripts actually exist, so the
+#      same verbs work in any pnpm/npm/yarn workspace another agent instance is
+#      dropped into.
+#
+# Usage:
+#   dev verify [filter]   typecheck + test, fail-fast — the pre-report gate
+#   dev test   [filter]   run tests (filter is passed through, e.g. a pkg or file)
+#   dev typecheck         type-check only
+#   dev lint              lint only
+#   dev build             build only
+#   dev caps              print available verbs as JSON (tool discovery)
+#   dev help              this text
+#
+# Exit code is the underlying tool's: 0 = clean, non-zero = something to fix.
+
+set -eu
+
+# --- repo + toolchain discovery -------------------------------------------
+
+repo_root() {
+  # Prefer the git toplevel so the agent can run `dev` from any subdirectory.
+  if root=$(git rev-parse --show-toplevel 2>/dev/null); then
+    printf '%s\n' "$root"
+  else
+    pwd
+  fi
+}
+
+ROOT=$(repo_root)
+cd "$ROOT"
+
+# Package manager: honour a committed lockfile, else fall back to what's on PATH.
+detect_pm() {
+  if [ -f pnpm-lock.yaml ]; then echo pnpm; return; fi
+  if [ -f yarn.lock ]; then echo yarn; return; fi
+  if [ -f package-lock.json ]; then echo npm; return; fi
+  for pm in pnpm npm yarn; do
+    if command -v "$pm" >/dev/null 2>&1; then echo "$pm"; return; fi
+  done
+  echo pnpm
+}
+PM=$(detect_pm)
+
+# Route through rtk when available for the token savings; transparent otherwise.
+if command -v rtk >/dev/null 2>&1; then RTK="rtk"; else RTK=""; fi
+
+# Does package.json define this npm script? (node is guaranteed in this stack.)
+has_script() {
+  node -e "process.exit(((require('./package.json').scripts)||{})['$1']?0:1)" 2>/dev/null
+}
+
+# Run a package.json script through rtk+pm; no-op (success) if it doesn't exist,
+# so `verify` stays useful in a repo that has tests but no lint, etc.
+run_script() {
+  name=$1; shift
+  if ! has_script "$name"; then
+    echo "dev: no \"$name\" script in $ROOT/package.json — skipping" >&2
+    return 0
+  fi
+  echo "dev: $PM run $name $*" >&2
+  # shellcheck disable=SC2086
+  $RTK $PM run "$name" "$@"
+}
+
+# Resolve a filter argument to a workspace package name by reading its
+# package.json. Returns the name if found, empty string otherwise.
+# This lets "apps/web/" map to "web" for --filter rather than being passed
+# as a vitest filename filter (which would match no files and exit 1).
+pkg_for() {
+  _clean=$(printf '%s' "$1" | sed 's|/*$||')
+  _pkgjson="$ROOT/$_clean/package.json"
+  if [ -f "$_pkgjson" ]; then
+    node -e "try{process.stdout.write((require('$_pkgjson').name)||'')}catch(e){}" 2>/dev/null
+  fi
+}
+
+# --- verbs -----------------------------------------------------------------
+
+cmd_typecheck() { run_script typecheck; }
+cmd_lint()      { run_script lint; }
+cmd_build()     { run_script build; }
+
+# When filters are module paths (e.g. "apps/web/", "apps/api/"), translate them
+# to workspace package selectors so the right package's test script runs, not a
+# vitest filename filter that matches no files.
+cmd_test() {
+  if [ $# -eq 0 ]; then
+    run_script test
+    return
+  fi
+  _test_failed=0
+  for _f in "$@"; do
+    _pkg=$(pkg_for "$_f")
+    if [ -n "$_pkg" ]; then
+      echo "dev: $PM --filter '$_pkg' test" >&2
+      # shellcheck disable=SC2086
+      $RTK $PM --filter "$_pkg" test || _test_failed=1
+    else
+      run_script test "$_f" || _test_failed=1
+    fi
+  done
+  return $_test_failed
+}
+
+# The gate a developer runs before reporting "completed": fail fast on the
+# cheapest signal (types) before spending time/tokens on the test suite.
+cmd_verify() {
+  cmd_typecheck
+  cmd_test "$@"
+}
+
+# Machine-readable capability list so an agent can discover what's wired up here
+# instead of guessing. Reports which verbs are backed by a real script.
+cmd_caps() {
+  printf '{"root":"%s","pm":"%s","rtk":%s,"verbs":{' \
+    "$ROOT" "$PM" "$([ -n "$RTK" ] && echo true || echo false)"
+  first=1
+  for v in typecheck test lint build; do
+    if has_script "$v"; then avail=true; else avail=false; fi
+    [ $first -eq 1 ] && first=0 || printf ','
+    printf '"%s":%s' "$v" "$avail"
+  done
+  printf ',"verify":true}}\n'
+}
+
+cmd_help() { sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; }
+
+# --- dispatch --------------------------------------------------------------
+
+verb=${1:-help}
+[ $# -gt 0 ] && shift || true
+case "$verb" in
+  verify)            cmd_verify "$@" ;;
+  test)              cmd_test "$@" ;;
+  typecheck|tc)      cmd_typecheck ;;
+  lint)              cmd_lint ;;
+  build)             cmd_build ;;
+  caps)              cmd_caps ;;
+  help|-h|--help)    cmd_help ;;
+  *)
+    echo "dev: unknown verb '$verb' (try: verify test typecheck lint build caps)" >&2
+    exit 2
+    ;;
+esac

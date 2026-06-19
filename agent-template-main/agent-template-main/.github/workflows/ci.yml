@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  adapters-in-sync:
+    name: Agent adapters in sync with AGENTS.md
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check tool adapters are not stale
+        run: bash scripts/sync-agent-config.sh --check
+
+  harness:
+    name: dev-team harness (typecheck + offline eval)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agents
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: agents/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test:agents
