@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+agents/dev-team/node_modules/
+
+# Harness runtime artifacts
+**/.scratch/
+**/.run-state.json
+**/.supervisor-status.json
+**/.run-ledger.*
+
+# OPEN exploration output (discovery reports are scratch, regenerated per run)
+.exploration/
+
+# Secrets & local env
+.env
+.env.*
+!.env.example
+
+# Per-machine Claude overrides (personal, never shared)
+.claude/settings.local.json
+
+# OS / editor
+.DS_Store
+*.local

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "mcp__github__merge_pull_request",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'BRANCH CLEANUP REQUIRED: PR was merged. You MUST immediately run: bash .claude/hooks/delete-branch.sh <head-branch-name>  — replace <head-branch-name> with the PR head branch you just merged. Never skip this step.'"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Skill(*)",
+      "WebSearch",
+      "mcp__*"
+    ]
+  }
+}

@@ -1,0 +1,43 @@
+<div class="terminal-container">
+  <div class="terminal-header">
+    <h1>getLifted Terminal</h1>
+    <button (click)="clearTerminal()" class="clear-btn" aria-label="Clear terminal">Clear</button>
+  </div>
+
+  <div id="terminal-output" class="terminal-output" role="log" aria-live="polite">
+    <div *ngFor="let item of history; let last = last" class="history-item">
+      <div class="command-line">
+        <span class="prompt">&gt;</span>
+        <span class="command-text">{{ item.command }}</span>
+      </div>
+      <div class="output-line" *ngIf="item.output">
+        <pre class="output-content">{{ formatOutput(item.output) }}</pre>
+        <button (click)="copyToClipboard(item.output)" class="copy-btn" aria-label="Copy output">Copy</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="terminal-input-area">
+    <span class="prompt">&gt;</span>
+    <input
+      #commandInputRef
+      type="text"
+      [(ngModel)]="commandInput"
+      (keydown)="onKeyDown($event)"
+      class="command-input"
+      placeholder="Type 'help' for commands"
+      aria-label="Terminal input"
+      autocomplete="off"
+      [disabled]="isLoading"
+    />
+    <span *ngIf="isLoading" class="loading-spinner">⏳</span>
+  </div>
+
+  <div *ngIf="errorMessage" class="error-message" role="alert">
+    ❌ Error: {{ errorMessage }}
+  </div>
+
+  <div class="terminal-footer">
+    <small>Use ↑↓ to navigate history | Type 'help' for commands</small>
+  </div>
+</div>

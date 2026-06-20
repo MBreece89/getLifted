@@ -1,0 +1,73 @@
+name: Template sync
+
+# Inherit shared files (subagents, skills, hooks, harness core, scripts, workflows)
+# from the agent-template upstream. Runs weekly + on demand; opens a PR when the
+# template has moved. Project-owned files are excluded by template-lock.json.
+#
+# AUTH (important): agent-template is a PRIVATE repo, and the default GITHUB_TOKEN
+# can only read THIS repo. To let the job fetch the template, add a repository
+# secret named TEMPLATE_SYNC_TOKEN — a fine-grained PAT (or classic token) with
+# read access to phix/agent-template — then this workflow uses it for the fetch.
+# Without it, the fetch step will fail with an auth error (that's the signal to
+# add the secret).
+
+on:
+  schedule:
+    - cron: '0 10 * * 1'   # every Monday 10am UTC (after the skill-updates job)
+  workflow_dispatch:        # manual trigger from the Actions tab
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  template-sync:
+    name: Inherit shared files from agent-template
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configure git auth for the private template remote
+        env:
+          TEMPLATE_SYNC_TOKEN: ${{ secrets.TEMPLATE_SYNC_TOKEN }}
+        run: |
+          if [[ -z "$TEMPLATE_SYNC_TOKEN" ]]; then
+            echo "::warning::TEMPLATE_SYNC_TOKEN is not set — fetching the private template will fail."
+            echo "Add a fine-grained PAT with read access to phix/agent-template as the TEMPLATE_SYNC_TOKEN secret."
+          else
+            # Rewrite the template's https URL to embed the token, just for this job.
+            git config --global url."https://x-access-token:${TEMPLATE_SYNC_TOKEN}@github.com/".insteadOf "https://github.com/"
+          fi
+
+      - name: Pull inherited files from the template
+        run: bash scripts/sync-from-template.sh --update --ci
+
+      - name: Open PR if the template moved
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ ! -f .template-sync-summary.md ]]; then
+            echo "No template changes — nothing to do."
+            exit 0
+          fi
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          BRANCH="template-sync/$(date +%Y-%m-%d)"
+          if git ls-remote --exit-code origin "refs/heads/$BRANCH" >/dev/null 2>&1; then
+            echo "Branch $BRANCH already exists — skipping duplicate PR."
+            exit 0
+          fi
+
+          git checkout -b "$BRANCH"
+          # Stage everything the sync wrote, plus the (possibly updated) lock file.
+          git add -A
+          git commit -m "chore: sync shared files from agent-template ($(date +%Y-%m-%d))"
+          git push origin "$BRANCH"
+
+          gh pr create \
+            --title "chore: template sync ($(date +%Y-%m-%d))" \
+            --body "$(cat .template-sync-summary.md)" \
+            --base main \
+            --head "$BRANCH"
