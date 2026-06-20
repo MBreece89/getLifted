@@ -1,6 +1,9 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { catchError, of } from 'rxjs';
+import { environment } from '../../environments/environment';
+
+export type LogEventType = 'APP_INIT' | 'COMMAND_EXECUTED' | 'CLEAR_TERMINAL' | 'CLIPBOARD_COPY' | 'HISTORY_NAV' | 'GLOBAL_ERROR';
 
 export interface LogEvent {
   timestamp: string;
@@ -11,11 +14,13 @@ export interface LogEvent {
   latency: number;
 }
 
+const SENSITIVE_KEYS = ['password', 'token', 'apikey', 'secret', 'auth'];
+
 @Injectable({
   providedIn: 'root'
 })
 export class LoggingService {
-  private apiBaseUrl = 'http://localhost:8080';
+  private apiBaseUrl = environment.apiUrl;
   private isDevelopment = !this.isProduction();
 
   constructor(private http: HttpClient) {}
@@ -65,10 +70,8 @@ export class LoggingService {
    */
   private sanitizeParams(params: any): any {
     const sanitized = { ...params };
-    // Remove any secrets or sensitive data
-    const sensitiveKeys = ['password', 'token', 'apiKey', 'secret', 'auth'];
-    for (const key of sensitiveKeys) {
-      if (key in sanitized) {
+    for (const key of Object.keys(sanitized)) {
+      if (SENSITIVE_KEYS.includes(key.toLowerCase())) {
         sanitized[key] = '[REDACTED]';
       }
     }
@@ -83,12 +86,10 @@ export class LoggingService {
       return response;
     }
     const sanitized = JSON.parse(JSON.stringify(response));
-    const sensitiveKeys = ['password', 'token', 'apikey', 'secret', 'auth'];
-    
     const redact = (obj: any) => {
       if (typeof obj !== 'object' || obj === null) return;
       for (const [key, value] of Object.entries(obj)) {
-        if (sensitiveKeys.includes(key.toLowerCase())) {
+        if (SENSITIVE_KEYS.includes(key.toLowerCase())) {
           obj[key] = '[REDACTED]';
         } else if (typeof value === 'object' && value !== null) {
           redact(value);
@@ -98,6 +99,17 @@ export class LoggingService {
 
     redact(sanitized);
     return sanitized;
+  }
+
+  logEvent(eventType: LogEventType, payload: any): void {
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      eventType,
+      payload: this.sanitizeResponse(payload)
+    };
+    this.http.post(`${this.apiBaseUrl}/logs`, logEntry)
+      .pipe(catchError(() => { if (this.isDevelopment) console.log('[LOG EVENT]', logEntry); return of(null); }))
+      .subscribe();
   }
 
   /**

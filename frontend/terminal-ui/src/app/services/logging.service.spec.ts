@@ -102,4 +102,43 @@ describe('LoggingService', () => {
       req.flush({});
     });
   });
+
+  describe('logEvent', () => {
+    it('should post to /logs with eventType field when logEvent is called', () => {
+      const payload = { message: 'app started' };
+
+      service.logEvent('APP_INIT', payload);
+
+      const req = httpMock.expectOne(`${apiBaseUrl}/logs`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body.eventType).toBe('APP_INIT');
+      req.flush({});
+    });
+  });
+
+  describe('sanitization mixed case', () => {
+    it('should redact apiKey in params', () => {
+      service.logCommand('cmd', { apiKey: 'secret' }, {}, 200, 5);
+
+      const req = httpMock.expectOne(`${apiBaseUrl}/logs`);
+      expect(req.request.body.params.apiKey).toBe('[REDACTED]');
+      req.flush({});
+    });
+
+    it('should redact ApiKey in params', () => {
+      service.logCommand('cmd', { ApiKey: 'secret' }, {}, 200, 5);
+
+      const req = httpMock.expectOne(`${apiBaseUrl}/logs`);
+      expect(req.request.body.params.ApiKey).toBe('[REDACTED]');
+      req.flush({});
+    });
+
+    it('should redact APIKEY in params', () => {
+      service.logCommand('cmd', { APIKEY: 'secret' }, {}, 200, 5);
+
+      const req = httpMock.expectOne(`${apiBaseUrl}/logs`);
+      expect(req.request.body.params.APIKEY).toBe('[REDACTED]');
+      req.flush({});
+    });
+  });
 });

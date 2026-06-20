@@ -24,17 +24,19 @@ export class TerminalComponent implements OnInit {
   options: WorkoutOptions | null = null;
   isLoading: boolean = false;
   errorMessage: string = '';
+  private readonly ALLOWED_PARAMS = ['type', 't', 'bodyPart', 'b'];
 
   constructor(private apiService: ApiService, private loggingService: LoggingService) {}
 
   ngOnInit(): void {
-    // Preload options
     this.apiService.getOptions().subscribe({
       next: (opts) => {
         this.options = opts;
+        this.loggingService.logEvent('APP_INIT', { userAgent: navigator.userAgent, optionsLoaded: true });
       },
       error: (err) => {
         console.error('Failed to load options:', err);
+        this.loggingService.logEvent('APP_INIT', { userAgent: navigator.userAgent, optionsLoaded: false });
       }
     });
   }
@@ -70,6 +72,7 @@ export class TerminalComponent implements OnInit {
     }
 
     if (newIndex >= -1 && newIndex < this.history.length) {
+      this.loggingService.logEvent('HISTORY_NAV', { direction, historyIndex: newIndex });
       this.historyIndex = newIndex;
       if (newIndex === -1) {
         this.commandInput = '';
@@ -103,6 +106,15 @@ export class TerminalComponent implements OnInit {
     const command = parts[0].toLowerCase();
     const params = this.parseParams(parts.slice(1));
 
+    const unknownKey = this.validateParams(params, command);
+    if (unknownKey !== null) {
+      this.errorMessage = `Unknown parameter: ${unknownKey}. Use 'help' to see valid parameters.`;
+      this.isLoading = false;
+      this.addToHistory(trimmed, { error: this.errorMessage });
+      this.loggingService.logCommand(trimmed, params, { error: this.errorMessage }, 400, 0);
+      return;
+    }
+
     let output: any = null;
     let status: number = 200;
 
@@ -114,6 +126,8 @@ export class TerminalComponent implements OnInit {
       this.handlePlan(params, startTime, command);
     } else if (command === 'options') {
       this.handleOptions(params, startTime, command);
+    } else if (command === 'clear') {
+      this.handleClear(startTime);
     } else {
       this.errorMessage = `Unknown command: ${command}`;
       this.isLoading = false;
@@ -141,7 +155,8 @@ export class TerminalComponent implements OnInit {
           { command: 'help', description: 'Show available commands' },
           { command: 'get-workout', description: 'Get a random workout', params: '--type (TYPE)' },
           { command: 'plan', description: 'Get a workout plan', params: '--type (TYPE)' },
-          { command: 'options', description: 'Show available types and body parts' }
+          { command: 'options', description: 'Show available types and body parts' },
+          { command: 'clear', description: 'Clear terminal history' }
         ];
         this.addToHistory(this.commandInput, defaultCommands);
         this.loggingService.logCommand(this.commandInput, params, defaultCommands, 200, latency);
@@ -170,13 +185,10 @@ export class TerminalComponent implements OnInit {
       },
       error: (err) => {
         const latency = performance.now() - startTime;
-        const errorOutput = {
-          error: err.error?.error || 'Failed to fetch workout',
-          details: err.error?.details || ''
-        };
-        this.errorMessage = errorOutput.error;
-        this.addToHistory(this.commandInput, errorOutput);
-        this.loggingService.logCommand(this.commandInput, params, errorOutput, err.status || 500, latency);
+        const rawError = { error: err.error?.error || 'Unknown error', details: err.error?.details || '' };
+        this.errorMessage = 'Request failed. Please try again.';
+        this.addToHistory(this.commandInput, { error: 'Request failed. Please try again.' });
+        this.loggingService.logCommand(this.commandInput, params, rawError, err.status || 500, latency);
         this.isLoading = false;
       }
     });
@@ -200,13 +212,10 @@ export class TerminalComponent implements OnInit {
       },
       error: (err) => {
         const latency = performance.now() - startTime;
-        const errorOutput = {
-          error: err.error?.error || 'Failed to fetch plan',
-          details: err.error?.details || ''
-        };
-        this.errorMessage = errorOutput.error;
-        this.addToHistory(this.commandInput, errorOutput);
-        this.loggingService.logCommand(this.commandInput, params, errorOutput, err.status || 500, latency);
+        const rawError = { error: err.error?.error || 'Unknown error', details: err.error?.details || '' };
+        this.errorMessage = 'Request failed. Please try again.';
+        this.addToHistory(this.commandInput, { error: 'Request failed. Please try again.' });
+        this.loggingService.logCommand(this.commandInput, params, rawError, err.status || 500, latency);
         this.isLoading = false;
       }
     });
@@ -236,17 +245,37 @@ export class TerminalComponent implements OnInit {
         },
         error: (err) => {
           const latency = performance.now() - startTime;
-          const errorOutput = {
-            error: err.error?.error || 'Failed to fetch options',
-            details: err.error?.details || ''
-          };
-          this.errorMessage = errorOutput.error;
-          this.addToHistory(this.commandInput, errorOutput);
-          this.loggingService.logCommand(this.commandInput, params, errorOutput, err.status || 500, latency);
+          const rawError = { error: err.error?.error || 'Unknown error', details: err.error?.details || '' };
+          this.errorMessage = 'Request failed. Please try again.';
+          this.addToHistory(this.commandInput, { error: 'Request failed. Please try again.' });
+          this.loggingService.logCommand(this.commandInput, params, rawError, err.status || 500, latency);
           this.isLoading = false;
         }
       });
     }
+  }
+
+  private handleClear(startTime: number): void {
+    const sessionLength = this.history.length;
+    this.loggingService.logEvent('CLEAR_TERMINAL', { sessionLength });
+    this.clearTerminal();
+    this.isLoading = false;
+    this.commandInput = '';
+  }
+
+  private validateParams(params: any, command: string): string | null {
+    let allowedKeys: string[];
+    if (command === 'get-workout' || command === 'plan') {
+      allowedKeys = ['type', 't', 'bodyPart', 'b'];
+    } else {
+      allowedKeys = [];
+    }
+    for (const key of Object.keys(params)) {
+      if (!allowedKeys.includes(key)) {
+        return key;
+      }
+    }
+    return null;
   }
 
   /**
@@ -297,6 +326,7 @@ export class TerminalComponent implements OnInit {
    */
   copyToClipboard(output: any): void {
     const text = typeof output === 'string' ? output : JSON.stringify(output, null, 2);
+    this.loggingService.logEvent('CLIPBOARD_COPY', { contentLength: text.length });
     navigator.clipboard.writeText(text).then(() => {
       alert('Copied to clipboard');
     });

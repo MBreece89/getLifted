@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { ApiService, Workout, WorkoutOptions } from './api.service';
+import { environment } from '../../environments/environment';
 
 describe('ApiService', () => {
   let service: ApiService;
@@ -22,6 +23,16 @@ describe('ApiService', () => {
 
   it('should be created', () => {
     expect(service).toBeTruthy();
+  });
+
+  describe('base URL', () => {
+    it('should use environment.apiUrl as the base URL for requests', () => {
+      service.getWorkout().subscribe();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/workout`);
+      expect(req.request.url).toBe(`${environment.apiUrl}/workout`);
+      req.flush({ name: 'Push-Ups', bodyPart: 'chest', style: 'strength' });
+    });
   });
 
   describe('getWorkout', () => {
