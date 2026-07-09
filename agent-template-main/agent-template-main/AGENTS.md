@@ -44,7 +44,7 @@ Reusable procedures live in `.claude/skills/<name>/SKILL.md` as plain markdown �
 **any** agent can read and follow one on request ("follow the `tdd` skill").
 Claude Code additionally auto-triggers them and exposes them as `/<name>`.
 
-- **Planning / specs** — `grill-me`, `grill-with-docs`, `to-prd`, `to-issues`, `idea-to-pr`, `prototype`
+- **Planning / specs** — `grill-me`, `grill-with-docs`, `to-spec`, `to-tickets`, `idea-to-pr`, `prototype`
 - **Build / quality** — `tdd`, `diagnose`, `review`, `improve-codebase-architecture`, `setup-pre-commit`
 - **Workflow** — `status`, `handoff`, `zoom-out`, `triage`, `prod-triage`, `work-issues`, `clean-branches`, `git-guardrails-claude-code`
 - **Meta** — `write-a-skill`, `setup-matt-pocock-skills`, `graphify`, `caveman`
@@ -85,7 +85,7 @@ Two ways to run the agents, used together:
 The intended flow is **OPEN → CLOSED**: explore cheaply, produce a scoped plan,
 then let the closed engine execute it under its usual guarantees. The
 `discoveryToTasks` bridge (`agents/dev-team/exploration.ts`) converts a discovery
-report into closed tasks; the `grill-with-docs` → `to-prd` → `to-issues` skills are
+report into closed tasks; the `grill-with-docs` → `to-spec` → `to-tickets` skills are
 the interactive crystallization path. Entry point: `npm run dev:explore -- "goal"`
 (add `--run` to execute the discovered plan).
 

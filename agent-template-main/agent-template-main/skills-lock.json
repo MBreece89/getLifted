@@ -82,17 +82,17 @@
       "skillPath": "skills/engineering/tdd/SKILL.md",
       "computedHash": "af059705061156fd4845ddbb736fe92b564118ac5f03551e09ef9e8f6d970638"
     },
-    "to-issues": {
+    "to-spec": {
       "source": "mattpocock/skills",
       "sourceType": "github",
-      "skillPath": "skills/engineering/to-issues/SKILL.md",
-      "computedHash": "0e6a2973fa5bdf32570227c578f7e474d945dd9281615d31439664c3ef016fce"
+      "skillPath": "skills/engineering/to-spec/SKILL.md",
+      "computedHash": "ae324bbe2dda4f0480086822b406ccb05cd927365c680dd24d632e03ba9f4a47"
     },
-    "to-prd": {
+    "to-tickets": {
       "source": "mattpocock/skills",
       "sourceType": "github",
-      "skillPath": "skills/engineering/to-prd/SKILL.md",
-      "computedHash": "5212dee3af6a95e60d7daaedac08f15f2789b170468d57d23f722e516a255269"
+      "skillPath": "skills/engineering/to-tickets/SKILL.md",
+      "computedHash": "652bff3b02eb42e3752e6db87ad498c5c3fab1297944291fe66c07054571e3cb"
     },
     "triage": {
       "source": "mattpocock/skills",
